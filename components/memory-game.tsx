@@ -89,7 +89,6 @@ export default function MemoryGame() {
   const handleTitleClick = useCallback(() => {
     const newCount = titleClickCount + 1
     setTitleClickCount(newCount)
-    console.log(`Title clicked ${newCount} times`) // Debug log
     if (newCount === 5) {
       // Trigger the easter egg
       const allMatchedCards = cards.map(card => ({...card, isFlipped: true, isMatched: true}))
@@ -135,9 +134,9 @@ export default function MemoryGame() {
             width={windowSize.width}
             height={windowSize.height}
             numberOfPieces={1000}
-            gravity={0.1}
+            gravity={0.01}
             initialVelocityX={10}
-            initialVelocityY={50}
+            initialVelocityY={20}
             confettiSource={{
               x: windowSize.width,
               y: windowSize.height,
@@ -156,7 +155,6 @@ export default function MemoryGame() {
           Memory
         </span> Game
       </h1>
-      <p className="mb-4">Title click count: {titleClickCount}</p>
       <div className="mb-4">
         <span className="mr-4">Moves: {moves}</span>
         <span>Matched Pairs: {matchedPairs}/{emojis.length}</span>
