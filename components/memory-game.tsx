@@ -20,6 +20,7 @@ export default function MemoryGame() {
   const [moves, setMoves] = useState(0)
   const [isGameComplete, setIsGameComplete] = useState(false)
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 })
+  const [titleClickCount, setTitleClickCount] = useState(0)
   const [startTime, setStartTime] = useState<number | null>(null)
   const [endTime, setEndTime] = useState<number | null>(null)
 
@@ -101,8 +102,23 @@ export default function MemoryGame() {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
   }
 
+  const handleTitleClick = useCallback(() => {
+    const newCount = titleClickCount + 1
+    setTitleClickCount(newCount)
+    if (newCount === 5) {
+      // Trigger the easter egg
+      const allMatchedCards = cards.map(card => ({...card, isFlipped: true, isMatched: true}))
+      setCards(allMatchedCards)
+      setMatchedPairs(emojis.length)
+      setIsGameComplete(true)
+      // Reset the click count
+      setTitleClickCount(0)
+    }
+  }, [titleClickCount, cards])
+
   const resetGame = () => {
     initializeGame()
+    setTitleClickCount(0)
   }
 
   return (
@@ -127,7 +143,7 @@ export default function MemoryGame() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white text-black p-8 rounded-lg shadow-lg text-center">
               <h2 className="text-3xl font-bold mb-4">Congratulations!</h2>
-              <p className="text-xl mb-2">You've completed the game in {moves} moves!</p>
+              <p className="text-xl mb-2">You&apos;ve completed the game in {moves} moves!</p>
               <p className="text-xl mb-6">Time: {formatTime(endTime! - startTime!)}</p>
               <Button 
                 onClick={resetGame}
@@ -139,7 +155,14 @@ export default function MemoryGame() {
           </div>
         </>
       )}
-      <h1 className="text-3xl font-bold mb-4">Memory Game</h1>
+      <h1 className="text-3xl font-bold mb-4">
+        <span 
+          className="cursor-pointer" 
+          onClick={handleTitleClick}
+        >
+          Memory
+        </span> Game
+      </h1>
       <div className="mb-4">
         <span className="mr-4">Moves: {moves}</span>
         <span>Matched Pairs: {matchedPairs}/{emojis.length}</span>
@@ -166,13 +189,12 @@ export default function MemoryGame() {
       </div>
       <Button onClick={resetGame} className="transition-all duration-200 hover:scale-105 hover:shadow-lg">Reset Game</Button>
 
-      {/* Social media buttons */}
       <div className="absolute bottom-4 left-4 flex space-x-2">
         <a
           href="https://github.com/willhpkns"
           target="_blank"
           rel="noopener noreferrer"
-          className="p-1.5 bg-gray-800 text-white rounded-full transition-all duration-300 hover:bg-gray-600 hover:scale-110 hover:shadow-lg"
+          className="p-2 bg-gray-800 text-white rounded-full transition-all duration-300 hover:bg-gray-600 hover:scale-110 hover:shadow-lg"
           aria-label="GitHub Profile"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
@@ -183,7 +205,7 @@ export default function MemoryGame() {
           href="https://instagram.com/willhpkns"
           target="_blank"
           rel="noopener noreferrer"
-          className="p-1.5 bg-gray-800 text-white rounded-full transition-all duration-300 hover:bg-gray-600 hover:scale-110 hover:shadow-lg"
+          className="p-2 bg-gray-800 text-white rounded-full transition-all duration-300 hover:bg-gray-600 hover:scale-110 hover:shadow-lg"
           aria-label="Instagram Profile"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
