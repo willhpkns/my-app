@@ -6,9 +6,9 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Memory Game",
-  description: "A simple memory game",
+  description: "A fun memory game with emojis",
   icons: {
-    icon: "/favicon.ico",
+    icon: "/favicon.ico", // or '/favicon.png'
   },
 };
 
