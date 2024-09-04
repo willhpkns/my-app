@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { MongoClient, ServerApiVersion } from 'mongodb';
 import { LeaderboardEntry } from '@/components/types';
 
-const uri = process.env.MONGODB_URI;
+const uri = process.env.MONGODB_URI as string
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
