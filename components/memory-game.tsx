@@ -26,6 +26,7 @@ export default function MemoryGame() {
   const [showNameModal, setShowNameModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCongratulationsModal, setShowCongratulationsModal] = useState(false);
+  const [gameStarted, setGameStarted] = useState(false);
 
   useEffect(() => {
     initializeGame()
@@ -46,6 +47,7 @@ export default function MemoryGame() {
       setUserCountry(response.data.country_code);
     } catch (error) {
       console.error('Error fetching user country:', error);
+      setUserCountry('🌎'); // Set a default country code in case of error
     }
   };
 
@@ -62,14 +64,16 @@ export default function MemoryGame() {
     setMatchedPairs(0)
     setMoves(0)
     setIsGameComplete(false)
-    setStartTime(Date.now())
+    setStartTime(null)
     setEndTime(null)
+    setGameStarted(false)
   }
 
   const handleCardClick = (id: number) => {
     if (flippedCards.length === 2 || cards[id].isMatched || flippedCards.includes(id)) return
 
-    if (startTime === null) {
+    if (!gameStarted) {
+      setGameStarted(true)
       setStartTime(Date.now())
     }
 
@@ -89,6 +93,7 @@ export default function MemoryGame() {
     setIsGameComplete(true);
     setShowCongratulationsModal(true);
     setEndTime(Date.now());
+    setGameStarted(false);
   }
 
   const checkForMatch = (cardIds: number[]) => {
@@ -99,9 +104,8 @@ export default function MemoryGame() {
       if (newCards[firstCardId].emoji === newCards[secondCardId].emoji) {
         newCards[firstCardId].isMatched = true
         newCards[secondCardId].isMatched = true
-        const newMatchedPairs = matchedPairs + 1
-        setMatchedPairs(newMatchedPairs)
-        if (newMatchedPairs === emojis.length) {
+        setMatchedPairs(prev => prev + 1)
+        if (matchedPairs + 1 === emojis.length) {
           handleGameComplete();
         }
       } else {
@@ -115,7 +119,7 @@ export default function MemoryGame() {
   }
 
   const formatTime = (milliseconds: number) => {
-    if (milliseconds < 0) return "Cheater!";
+    if (!milliseconds || milliseconds < 0) return "0:00";
     const seconds = Math.floor(milliseconds / 1000);
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
@@ -174,7 +178,7 @@ export default function MemoryGame() {
     if (name && !isSubmitting) {
       setIsSubmitting(true);
       const newEntry: LeaderboardEntry = {
-        name,
+        name: name.trim(),
         time: endTime! - startTime!,
         moves,
         country: userCountry,
