@@ -118,25 +118,10 @@ export default function MemoryGame() {
           <Confetti
             width={windowSize.width}
             height={windowSize.height}
-            numberOfPieces={1000}
-            gravity={0.1}
-            initialVelocityX={6}
-            initialVelocityY={10}
-            confettiSource={{
-              x: 0,
-              y: windowSize.height,
-              w: 0,
-              h: 0
-            }}
-            wind={0.100}
-          />
-          <Confetti
-            width={windowSize.width}
-            height={windowSize.height}
-            numberOfPieces={1000}
+            numberOfPieces={300}
             gravity={0.01}
-            initialVelocityX={10}
-            initialVelocityY={20}
+            initialVelocityX={20}
+            initialVelocityY={10}
             confettiSource={{
               x: windowSize.width,
               y: windowSize.height,
@@ -145,6 +130,18 @@ export default function MemoryGame() {
             }}
             wind={-0.05}
           />
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white text-black p-8 rounded-lg shadow-lg text-center">
+              <h2 className="text-3xl font-bold mb-4">Congratulations!</h2>
+              <p className="text-xl mb-6">You've completed the game in {moves} moves!</p>
+              <Button 
+                onClick={resetGame}
+                className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full text-lg transition-colors duration-200"
+              >
+                Play Again
+              </Button>
+            </div>
+          </div>
         </>
       )}
       <h1 className="text-3xl font-bold mb-4">
