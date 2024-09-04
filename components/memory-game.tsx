@@ -137,19 +137,16 @@ export default function MemoryGame() {
     setIsEasterEggActivated(false)  // Reset the easter egg flag
   }
 
-  const loadLeaderboard = () => {
-    const storedLeaderboard = localStorage.getItem('memoryGameLeaderboard')
-    if (storedLeaderboard) {
-      setLeaderboard(JSON.parse(storedLeaderboard))
+  const loadLeaderboard = async () => {
+    try {
+      const response = await axios.get('/api/leaderboard');
+      setLeaderboard(response.data);
+    } catch (error) {
+      console.error('Error loading leaderboard:', error);
     }
   }
 
-  const saveLeaderboard = (newLeaderboard: LeaderboardEntry[]) => {
-    localStorage.setItem('memoryGameLeaderboard', JSON.stringify(newLeaderboard))
-    setLeaderboard(newLeaderboard)
-  }
-
-  const submitToLeaderboard = () => {
+  const submitToLeaderboard = async () => {
     if (hasSubmitted) {
       alert("You've already submitted your score for this game!")
       return
@@ -166,13 +163,18 @@ export default function MemoryGame() {
         name,
         time: endTime! - startTime!,
         moves,
-        country: userCountry, // Use the fetched country code
+        country: userCountry,
         date: new Date().toISOString(),
       }
-      const newLeaderboard = [...leaderboard, newEntry].sort((a, b) => a.time - b.time).slice(0, 10)
-      saveLeaderboard(newLeaderboard)
-      setShowLeaderboard(true)
-      setHasSubmitted(true)
+      try {
+        await axios.post('/api/leaderboard', newEntry);
+        await loadLeaderboard(); // Reload the leaderboard after submission
+        setShowLeaderboard(true);
+        setHasSubmitted(true);
+      } catch (error) {
+        console.error('Error submitting to leaderboard:', error);
+        alert('Failed to submit score. Please try again.');
+      }
     }
   }
   
