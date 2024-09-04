@@ -23,6 +23,9 @@ export default function MemoryGame() {
   const [hasSubmitted, setHasSubmitted] = useState(false)
   const [isEasterEggActivated, setIsEasterEggActivated] = useState(false)
   const [userCountry, setUserCountry] = useState('🌎');
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showCongratulationsModal, setShowCongratulationsModal] = useState(false);
 
   useEffect(() => {
     initializeGame()
@@ -82,19 +85,24 @@ export default function MemoryGame() {
     }
   }
 
+  const handleGameComplete = () => {
+    setIsGameComplete(true);
+    setShowCongratulationsModal(true);
+    setEndTime(Date.now());
+  }
+
   const checkForMatch = (cardIds: number[]) => {
     setTimeout(() => {
       const [firstCardId, secondCardId] = cardIds
       const newCards = [...cards]
 
-      if (cards[firstCardId].emoji === cards[secondCardId].emoji) {
+      if (newCards[firstCardId].emoji === newCards[secondCardId].emoji) {
         newCards[firstCardId].isMatched = true
         newCards[secondCardId].isMatched = true
         const newMatchedPairs = matchedPairs + 1
         setMatchedPairs(newMatchedPairs)
         if (newMatchedPairs === emojis.length) {
-          setIsGameComplete(true)
-          setEndTime(Date.now())
+          handleGameComplete();
         }
       } else {
         newCards[firstCardId].isFlipped = false
@@ -130,11 +138,13 @@ export default function MemoryGame() {
   }, [titleClickCount, cards])
 
   const resetGame = () => {
-    initializeGame()
-    setTitleClickCount(0)
-    setShowLeaderboard(false)
-    setHasSubmitted(false)
-    setIsEasterEggActivated(false)  // Reset the easter egg flag
+    initializeGame();
+    setTitleClickCount(0);
+    setShowLeaderboard(false);
+    setHasSubmitted(false);
+    setIsEasterEggActivated(false);
+    setIsGameComplete(false);
+    setShowCongratulationsModal(false);
   }
 
   const loadLeaderboard = async () => {
@@ -146,7 +156,7 @@ export default function MemoryGame() {
     }
   }
 
-  const submitToLeaderboard = async () => {
+  const submitToLeaderboard = () => {
     if (hasSubmitted) {
       alert("You've already submitted your score for this game!")
       return
@@ -157,8 +167,12 @@ export default function MemoryGame() {
       return
     }
 
-    const name = prompt("Enter your name for the leaderboard:")
-    if (name) {
+    setShowNameModal(true);
+  }
+
+  const handleNameSubmit = async (name: string) => {
+    if (name && !isSubmitting) {
+      setIsSubmitting(true);
       const newEntry: LeaderboardEntry = {
         name,
         time: endTime! - startTime!,
@@ -168,62 +182,72 @@ export default function MemoryGame() {
       }
       try {
         await axios.post('/api/leaderboard', newEntry);
-        await loadLeaderboard(); // Reload the leaderboard after submission
+        await loadLeaderboard();
         setShowLeaderboard(true);
         setHasSubmitted(true);
       } catch (error) {
         console.error('Error submitting to leaderboard:', error);
         alert('Failed to submit score. Please try again.');
       }
+      setIsSubmitting(false);
     }
+    setShowNameModal(false);
   }
-  
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4 relative">
       {isGameComplete && (
-        <>
-          <Confetti
-            width={windowSize.width}
-            height={windowSize.height}
-            numberOfPieces={300}
-            gravity={0.01}
-            initialVelocityX={20}
-            initialVelocityY={10}
-            confettiSource={{
-              x: windowSize.width,
-              y: windowSize.height,
-              w: 0,
-              h: 0
-            }}
-            wind={-0.05}
-          />
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white text-black p-8 rounded-lg shadow-lg text-center">
-              <h2 className="text-3xl font-bold mb-4">
-                {isEasterEggActivated ? "Stop cheating!" : "Congratulations!"}
-              </h2>
-              <p className="text-xl mb-2">You&apos;ve completed the game in {moves} moves!</p>
-              <p className="text-xl mb-6">Time: {formatTime(endTime! - startTime!)}</p>
-              <div className="flex justify-center space-x-4">
-                {!hasSubmitted && !isEasterEggActivated && (
-                  <Button 
-                    onClick={submitToLeaderboard}
-                    className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-full text-lg transition-all duration-200 hover:scale-105 hover:shadow-lg"
-                  >
-                    Submit to Leaderboard
-                  </Button>
-                )}
+        <Confetti
+          width={windowSize.width}
+          height={windowSize.height}
+          numberOfPieces={300}
+          gravity={0.01}
+          initialVelocityX={20}
+          initialVelocityY={20}
+          confettiSource={{
+            x: windowSize.width,
+            y: windowSize.height,
+            w: 0,
+            h: 0
+          }}
+          wind={-0.05}
+        />
+      )}
+      {showCongratulationsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white text-black p-8 rounded-lg shadow-lg text-center relative">
+            <button
+              onClick={() => setShowCongratulationsModal(false)}
+              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 transition-colors duration-200"
+              aria-label="Close"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <h2 className="text-3xl font-bold mb-4">
+              {isEasterEggActivated ? "Stop cheating!" : "Congratulations!"}
+            </h2>
+            <p className="text-xl mb-2">You&apos;ve completed the game in {moves} moves!</p>
+            <p className="text-xl mb-6">Time: {formatTime(endTime! - startTime!)}</p>
+            <div className="flex justify-center space-x-4">
+              {!hasSubmitted && !isEasterEggActivated && (
                 <Button 
-                  onClick={resetGame}
-                  className="bg-black hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-full text-lg transition-all duration-200 hover:scale-105 hover:shadow-lg"
+                  onClick={submitToLeaderboard}
+                  className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-full text-lg transition-all duration-200 hover:scale-105 hover:shadow-lg"
                 >
-                  Play Again
+                  Submit to Leaderboard
                 </Button>
-              </div>
+              )}
+              <Button 
+                onClick={resetGame}
+                className="bg-black hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-full text-lg transition-all duration-200 hover:scale-105 hover:shadow-lg"
+              >
+                Play Again
+              </Button>
             </div>
           </div>
-        </>
+        </div>
       )}
       <h1 className="text-3xl font-bold mb-4">
         <span 
@@ -311,6 +335,36 @@ export default function MemoryGame() {
           </svg>
         </a>
       </div>
+
+      {showNameModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white text-black p-8 rounded-lg shadow-lg">
+            <h2 className="text-2xl font-bold mb-4">Enter your name</h2>
+            <input
+              type="text"
+              className="border p-2 mb-4 w-full"
+              placeholder="Your name"
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  handleNameSubmit((e.target as HTMLInputElement).value);
+                }
+              }}
+            />
+            <div className="flex justify-end space-x-2">
+              <Button onClick={() => setShowNameModal(false)}>Cancel</Button>
+              <Button 
+                onClick={() => {
+                  const inputElement = document.querySelector('input[type="text"]') as HTMLInputElement;
+                  handleNameSubmit(inputElement?.value || '');
+                }}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Submitting...' : 'Submit'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         .perspective-1000 {
