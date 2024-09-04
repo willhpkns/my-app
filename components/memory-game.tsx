@@ -1,15 +1,10 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { Button } from "@/components/ui/button"
+import axios from 'axios';
+import { useState, useEffect, useCallback } from 'react'
+import { Button } from '@/components/ui/button'
 import Confetti from 'react-confetti'
-
-type CardType = {
-  id: number
-  emoji: string
-  isFlipped: boolean
-  isMatched: boolean
-}
+import { CardType, LeaderboardEntry } from '@/types'
 
 const emojis = ["🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼"]
 
@@ -23,10 +18,17 @@ export default function MemoryGame() {
   const [titleClickCount, setTitleClickCount] = useState(0)
   const [startTime, setStartTime] = useState<number | null>(null)
   const [endTime, setEndTime] = useState<number | null>(null)
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
+  const [showLeaderboard, setShowLeaderboard] = useState(false)
+  const [hasSubmitted, setHasSubmitted] = useState(false)
+  const [isEasterEggActivated, setIsEasterEggActivated] = useState(false)
+  const [userCountry, setUserCountry] = useState('🌎');
 
   useEffect(() => {
     initializeGame()
     updateWindowSize()
+    loadLeaderboard()
+    getUserCountry();
     window.addEventListener('resize', updateWindowSize)
     return () => window.removeEventListener('resize', updateWindowSize)
   }, [])
@@ -34,6 +36,15 @@ export default function MemoryGame() {
   const updateWindowSize = () => {
     setWindowSize({ width: window.innerWidth, height: window.innerHeight })
   }
+
+  const getUserCountry = async () => {
+    try {
+      const response = await axios.get('https://ipapi.co/json/');
+      setUserCountry(response.data.country_code);
+    } catch (error) {
+      console.error('Error fetching user country:', error);
+    }
+  };
 
   const initializeGame = () => {
     const shuffledEmojis = [...emojis, ...emojis].sort(() => Math.random() - 0.5)
@@ -96,10 +107,11 @@ export default function MemoryGame() {
   }
 
   const formatTime = (milliseconds: number) => {
-    const seconds = Math.floor(milliseconds / 1000)
-    const minutes = Math.floor(seconds / 60)
-    const remainingSeconds = seconds % 60
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
+    if (milliseconds < 0) return "Cheater!";
+    const seconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   }
 
   const handleTitleClick = useCallback(() => {
@@ -111,7 +123,8 @@ export default function MemoryGame() {
       setCards(allMatchedCards)
       setMatchedPairs(emojis.length)
       setIsGameComplete(true)
-      // Reset the click count
+      setEndTime(Date.now())
+      setIsEasterEggActivated(true)  // Set this flag when easter egg is activated
       setTitleClickCount(0)
     }
   }, [titleClickCount, cards])
@@ -119,7 +132,50 @@ export default function MemoryGame() {
   const resetGame = () => {
     initializeGame()
     setTitleClickCount(0)
+    setShowLeaderboard(false)
+    setHasSubmitted(false)
+    setIsEasterEggActivated(false)  // Reset the easter egg flag
   }
+
+  const loadLeaderboard = () => {
+    const storedLeaderboard = localStorage.getItem('memoryGameLeaderboard')
+    if (storedLeaderboard) {
+      setLeaderboard(JSON.parse(storedLeaderboard))
+    }
+  }
+
+  const saveLeaderboard = (newLeaderboard: LeaderboardEntry[]) => {
+    localStorage.setItem('memoryGameLeaderboard', JSON.stringify(newLeaderboard))
+    setLeaderboard(newLeaderboard)
+  }
+
+  const submitToLeaderboard = () => {
+    if (hasSubmitted) {
+      alert("You've already submitted your score for this game!")
+      return
+    }
+
+    if (isEasterEggActivated) {
+      alert("Nice try, cheater! Your score won't be submitted to the leaderboard.")
+      return
+    }
+
+    const name = prompt("Enter your name for the leaderboard:")
+    if (name) {
+      const newEntry: LeaderboardEntry = {
+        name,
+        time: endTime! - startTime!,
+        moves,
+        country: userCountry, // Use the fetched country code
+        date: new Date().toISOString(),
+      }
+      const newLeaderboard = [...leaderboard, newEntry].sort((a, b) => a.time - b.time).slice(0, 10)
+      saveLeaderboard(newLeaderboard)
+      setShowLeaderboard(true)
+      setHasSubmitted(true)
+    }
+  }
+  
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4 relative">
@@ -142,15 +198,27 @@ export default function MemoryGame() {
           />
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white text-black p-8 rounded-lg shadow-lg text-center">
-              <h2 className="text-3xl font-bold mb-4">Congratulations!</h2>
-              <p className="text-xl mb-2">You&apos;ve completed the game in {moves} moves!</p>
+              <h2 className="text-3xl font-bold mb-4">
+                {isEasterEggActivated ? "Stop cheating!" : "Congratulations!"}
+              </h2>
+              <p className="text-xl mb-2">You've completed the game in {moves} moves!</p>
               <p className="text-xl mb-6">Time: {formatTime(endTime! - startTime!)}</p>
-              <Button 
-                onClick={resetGame}
-                className="bg-black hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-full text-lg transition-all duration-200 hover:scale-105 hover:shadow-lg"
-              >
-                Play Again
-              </Button>
+              <div className="flex justify-center space-x-4">
+                {!hasSubmitted && !isEasterEggActivated && (
+                  <Button 
+                    onClick={submitToLeaderboard}
+                    className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-full text-lg transition-all duration-200 hover:scale-105 hover:shadow-lg"
+                  >
+                    Submit to Leaderboard
+                  </Button>
+                )}
+                <Button 
+                  onClick={resetGame}
+                  className="bg-black hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-full text-lg transition-all duration-200 hover:scale-105 hover:shadow-lg"
+                >
+                  Play Again
+                </Button>
+              </div>
             </div>
           </div>
         </>
@@ -187,8 +255,36 @@ export default function MemoryGame() {
           </div>
         ))}
       </div>
-      <Button onClick={resetGame} className="transition-all duration-200 hover:scale-105 hover:shadow-lg">Reset Game</Button>
-
+      <Button onClick={() => setShowLeaderboard(!showLeaderboard)} className="mb-4">
+        {showLeaderboard ? "Hide Leaderboard" : "Show Leaderboard"}
+      </Button>
+      {showLeaderboard && (
+        <div className="w-full max-w-2xl">
+          <h2 className="text-2xl font-bold mb-2">Leaderboard</h2>
+          <table className="w-full">
+            <thead>
+              <tr>
+                <th className="text-left">Rank</th>
+                <th className="text-left">Name</th>
+                <th className="text-left">Time</th>
+                <th className="text-left">Moves</th>
+                <th className="text-left">Country</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leaderboard.map((entry, index) => (
+                <tr key={index}>
+                  <td>{index + 1}</td>
+                  <td>{entry.name}</td>
+                  <td>{formatTime(entry.time)}</td>
+                  <td>{entry.moves}</td>
+                  <td>{entry.country}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       <div className="absolute bottom-4 left-4 flex space-x-2">
         <a
           href="https://github.com/willhpkns"
