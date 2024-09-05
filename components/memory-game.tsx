@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import Confetti from 'react-confetti'
 import { CardType, LeaderboardEntry } from '@/components/types'
 
+
 const emojis = ["🐶", "🐱", "🐭", "🐸", "🐰", "🐵", "🐻", "🐼", ]
 
 export default function MemoryGame() {
