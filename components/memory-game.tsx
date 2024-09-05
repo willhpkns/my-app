@@ -80,8 +80,8 @@ export default function MemoryGame() {
   }
 
   const handleCardClick = async (id: number) => {
-    if (cards[id].isMatched || cards[id].isFlipped || flippedCards.length === 2 || !sessionId) {
-      console.log(`Card click ignored. sessionId: ${sessionId}, flippedCards: ${flippedCards.length}, isMatched: ${cards[id].isMatched}, isFlipped: ${cards[id].isFlipped}`);
+    if (cards[id].isMatched || cards[id].isFlipped || flippedCards.length === 2 || !sessionId || isGameComplete) {
+      console.log(`Card click ignored. sessionId: ${sessionId}, flippedCards: ${flippedCards.length}, isMatched: ${cards[id].isMatched}, isFlipped: ${cards[id].isFlipped}, isGameComplete: ${isGameComplete}`);
       return;
     }
   
@@ -133,6 +133,11 @@ export default function MemoryGame() {
             ));
           }
           setFlippedCards([]);
+
+          // Check if the game is completed after updating the cards
+          if (matchedPairs === emojis.length) {
+            handleGameComplete();
+          }
         }, 1000);
       }
   
@@ -157,17 +162,20 @@ export default function MemoryGame() {
       }
     }
   };
+
   const handleGameComplete = async () => {
+    console.log("Game completed!");
     setIsGameComplete(true);
     setShowCongratulationsModal(true);
     const currentTime = Date.now();
     setEndTime(currentTime);
     try {
-      await axios.post('/api/leaderboard', { 
+      const response = await axios.post('/api/leaderboard', { 
         action: 'completeGame', 
         sessionId, 
         endTime: currentTime 
       });
+      console.log('Game completion response:', response.data);
     } catch (error) {
       console.error('Error completing game:', error);
     }
@@ -198,13 +206,13 @@ export default function MemoryGame() {
   }, [titleClickCount, cards])
 
   const resetGame = () => {
+    setIsGameComplete(false);
+    setShowCongratulationsModal(false);
     initializeGame();
     setTitleClickCount(0);
     setShowLeaderboard(false);
     setHasSubmitted(false);
     setIsEasterEggActivated(false);
-    setIsGameComplete(false);
-    setShowCongratulationsModal(false);
   }
 
   const loadLeaderboard = async () => {
@@ -334,7 +342,7 @@ export default function MemoryGame() {
             className={`w-20 h-20 cursor-pointer perspective-1000 transition-all duration-200 hover:scale-105 hover:shadow-lg ${
               card.isFlipped || card.isMatched ? "flipped" : ""
             }`}
-            onClick={() => handleCardClick(card.id)}
+            onClick={() => !isGameComplete && handleCardClick(card.id)}
           >
             <div className="relative w-full h-full transition-transform duration-500 transform-style-3d">
               <div className="absolute w-full h-full flex items-center justify-center text-3xl bg-secondary backface-hidden">

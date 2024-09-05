@@ -144,11 +144,6 @@ async function recordMove(body: any) {
     session.flippedCards = []; // Reset flipped cards after each pair
   }
 
-  const gameCompleted = session.matchedPairs === session.cards.length / 2;
-  if (gameCompleted) {
-    session.completed = true;
-  }
-
   const revealedCards = session.cards.map((emoji, index) => {
     if (index === cardId || (matchMade && (index === session.flippedCards[0] || index === session.flippedCards[1]))) {
       return emoji;
@@ -172,14 +167,22 @@ async function completeGame(body: any) {
   const { sessionId, endTime } = body;
   const session = gameSessions[sessionId];
 
-  if (!session || !session.completed) {
-    return NextResponse.json({ error: 'Invalid game session or game not completed' }, { status: 400 });
+  if (!session) {
+    return NextResponse.json({ error: 'Invalid game session' }, { status: 400 });
   }
 
+  if (session.completed) {
+    return NextResponse.json({ error: 'Game already completed' }, { status: 400 });
+  }
+
+  session.completed = true;
   const gameTime = endTime - session.startTime;
+
   if (gameTime < 5000) {
     return NextResponse.json({ error: 'Suspicious game time' }, { status: 400 });
   }
+
+  console.log(`Game completed. SessionId: ${sessionId}, Moves: ${session.moves}, Time: ${gameTime}ms`);
 
   return NextResponse.json({ success: true, moves: session.moves, time: gameTime });
 }
