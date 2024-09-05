@@ -128,7 +128,7 @@ export default function MemoryGame() {
             ));
           }
           setFlippedCards([]);
-
+  
           // Check if the game is completed after updating the cards
           if (matchedPairs === emojis.length) {
             handleGameComplete();
@@ -140,18 +140,8 @@ export default function MemoryGame() {
         handleGameComplete();
       }
     } catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        if (error.response.status === 429) {
-          // Handle rate limiting
-          const timeToWait = error.response.data.timeToWait || 500;
-          setTimeout(() => handleCardClick(id), timeToWait);
-        } else if (error.response.status === 400) {
-          // Handle invalid move
-          initializeGame();
-        }
-      } else {
-        console.error('Unexpected error:', error);
-      }
+      console.error('Error handling card click:', error);
+      // Optionally, you can add a user-friendly error message here
     }
   };
 

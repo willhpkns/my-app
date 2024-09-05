@@ -108,11 +108,12 @@ async function recordMove(body: any) {
     return NextResponse.json({ error: 'Invalid game session' }, { status: 400 });
   }
 
-  const currentTime = Date.now();
-  if (currentTime - session.lastMoveTimestamp < 500) {
-    return NextResponse.json({ error: 'Moving too fast', timeToWait: 500 - (currentTime - session.lastMoveTimestamp) }, { status: 429 });
-  }
-  session.lastMoveTimestamp = currentTime;
+  // Remove the rate limiting check
+  // const currentTime = Date.now();
+  // if (currentTime - session.lastMoveTimestamp < 500) {
+  //   return NextResponse.json({ error: 'Moving too fast', timeToWait: 500 - (currentTime - session.lastMoveTimestamp) }, { status: 429 });
+  // }
+  session.lastMoveTimestamp = Date.now();
 
   if (session.flippedCards.includes(cardId)) {
     return NextResponse.json({ error: 'Card already flipped' }, { status: 400 });
