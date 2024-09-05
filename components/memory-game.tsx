@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import Confetti from 'react-confetti'
 import { CardType, LeaderboardEntry } from '@/components/types'
 
-const emojis = ["🐶", "🐱", "🐭", "🐸", "🐰", "🐵", "🐻", "🐼", ]
+const emojis = ["🐶", "🐱", "🐭", "🐹", "🐰", "🐵", "🐻", "🐼", ]
 
 export default function MemoryGame() {
   const [cards, setCards] = useState<CardType[]>([])
@@ -27,6 +27,7 @@ export default function MemoryGame() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCongratulationsModal, setShowCongratulationsModal] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     initializeGame()
@@ -51,7 +52,7 @@ export default function MemoryGame() {
     }
   };
 
-  const initializeGame = () => {
+  const initializeGame = async () => {
     const shuffledEmojis = [...emojis, ...emojis].sort(() => Math.random() - 0.5)
     const newCards = shuffledEmojis.map((emoji, index) => ({
       id: index,
@@ -67,10 +68,14 @@ export default function MemoryGame() {
     setStartTime(null)
     setEndTime(null)
     setGameStarted(false)
+
+    const response = await axios.post('/api/leaderboard', { action: 'initializeGame', emojis });
+    const sessionId = response.data.sessionId;
+    setSessionId(sessionId);
   }
 
-  const handleCardClick = (id: number) => {
-    if (flippedCards.length === 2 || cards[id].isMatched || flippedCards.includes(id)) return
+  const handleCardClick = async (id: number) => {
+    if (flippedCards.length === 2 || cards[id].isMatched || flippedCards.includes(id) || !sessionId) return
 
     if (!gameStarted) {
       setGameStarted(true)
@@ -85,14 +90,16 @@ export default function MemoryGame() {
 
     if (flippedCards.length === 1) {
       setMoves(moves + 1)
+      await axios.post('/api/leaderboard', { action: 'recordMove', sessionId, cardId: id, moves: moves + 1 });
       checkForMatch([flippedCards[0], id])
     }
   }
 
-  const handleGameComplete = () => {
+  const handleGameComplete = async () => {
     setIsGameComplete(true);
     setShowCongratulationsModal(true);
     setEndTime(Date.now());
+    await axios.post('/api/leaderboard', { action: 'completeGame', sessionId, endTime: Date.now() });
     setGameStarted(false);
   }
 
@@ -175,17 +182,15 @@ export default function MemoryGame() {
   }
 
   const handleNameSubmit = async (name: string) => {
-    if (name && !isSubmitting) {
+    if (name && !isSubmitting && sessionId) {
       setIsSubmitting(true);
-      const newEntry: LeaderboardEntry = {
-        name: name.trim(),
-        time: endTime! - startTime!,
-        moves,
-        country: userCountry,
-        date: new Date().toISOString(),
-      }
       try {
-        await axios.post('/api/leaderboard', newEntry);
+        await axios.post('/api/leaderboard', { 
+          action: 'submitScore', 
+          sessionId, 
+          name, 
+          country: userCountry 
+        });
         await loadLeaderboard();
         setShowLeaderboard(true);
         setHasSubmitted(true);
