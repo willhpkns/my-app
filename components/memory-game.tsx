@@ -53,77 +53,103 @@ export default function MemoryGame() {
   };
 
   const initializeGame = async () => {
-    const shuffledEmojis = [...emojis, ...emojis].sort(() => Math.random() - 0.5)
-    const newCards = shuffledEmojis.map((emoji, index) => ({
-      id: index,
-      emoji,
-      isFlipped: false,
-      isMatched: false,
-    }))
-    setCards(newCards)
-    setFlippedCards([])
-    setMatchedPairs(0)
-    setMoves(0)
-    setIsGameComplete(false)
-    setStartTime(null)
-    setEndTime(null)
-    setGameStarted(false)
-
-    const response = await axios.post('/api/leaderboard', { action: 'initializeGame', emojis });
-    const sessionId = response.data.sessionId;
-    setSessionId(sessionId);
+    try {
+      const response = await axios.post('/api/leaderboard', { action: 'initializeGame', emojis });
+      const { sessionId, cards } = response.data;
+      setSessionId(sessionId);
+      setCards(cards.map((emoji: string, index: number) => ({
+        id: index,
+        emoji,
+        isFlipped: false,
+        isMatched: false,
+      })));
+      setFlippedCards([]);
+      setMatchedPairs(0);
+      setMoves(0);
+      setIsGameComplete(false);
+      setStartTime(null);
+      setEndTime(null);
+      setGameStarted(false);
+    } catch (error) {
+      console.error('Error initializing game:', error);
+    }
   }
 
   const handleCardClick = async (id: number) => {
-    if (flippedCards.length === 2 || cards[id].isMatched || flippedCards.includes(id) || !sessionId) return
-
+    if (flippedCards.length === 2 || cards[id].isMatched || flippedCards.includes(id) || !sessionId) return;
+  
     if (!gameStarted) {
-      setGameStarted(true)
-      setStartTime(Date.now())
+      setGameStarted(true);
+      setStartTime(Date.now());
     }
-
-    const newCards = [...cards]
-    newCards[id].isFlipped = true
-    setCards(newCards)
-
-    setFlippedCards([...flippedCards, id])
-
-    if (flippedCards.length === 1) {
-      setMoves(moves + 1)
-      await axios.post('/api/leaderboard', { action: 'recordMove', sessionId, cardId: id, moves: moves + 1 });
-      checkForMatch([flippedCards[0], id])
+  
+    try {
+      const response = await axios.post('/api/leaderboard', { 
+        action: 'recordMove', 
+        sessionId, 
+        cardId: id 
+      });
+  
+      const { moves, matchedPairs, flippedCards: serverFlippedCards, completed, revealedCards } = response.data;
+  
+      setMoves(moves);
+      setMatchedPairs(matchedPairs);
+      setFlippedCards(serverFlippedCards);
+  
+      const newCards = cards.map((card, index) => ({
+        ...card,
+        isFlipped: serverFlippedCards.includes(index) || revealedCards[index] !== '?',
+        isMatched: revealedCards[index] !== '?',
+        emoji: revealedCards[index] !== '?' ? revealedCards[index] : card.emoji,
+      }));
+      setCards(newCards);
+  
+      if (completed) {
+        handleGameComplete();
+      }
+    } catch (error) {
+      console.error('Error recording move:', error);
     }
   }
 
   const handleGameComplete = async () => {
     setIsGameComplete(true);
     setShowCongratulationsModal(true);
-    setEndTime(Date.now());
-    await axios.post('/api/leaderboard', { action: 'completeGame', sessionId, endTime: Date.now() });
+    const currentTime = Date.now();
+    setEndTime(currentTime);
+    try {
+      await axios.post('/api/leaderboard', { 
+        action: 'completeGame', 
+        sessionId, 
+        endTime: currentTime 
+      });
+    } catch (error) {
+      console.error('Error completing game:', error);
+    }
     setGameStarted(false);
   }
 
-  const checkForMatch = (cardIds: number[]) => {
-    setTimeout(() => {
-      const [firstCardId, secondCardId] = cardIds
-      const newCards = [...cards]
+  // const checkForMatch = (cardIds: number[]) => {
+  //   setTimeout(() => {
+  //     const [firstCardId, secondCardId] = cardIds
+  //     const newCards = [...cards]
 
-      if (newCards[firstCardId].emoji === newCards[secondCardId].emoji) {
-        newCards[firstCardId].isMatched = true
-        newCards[secondCardId].isMatched = true
-        setMatchedPairs(prev => prev + 1)
-        if (matchedPairs + 1 === emojis.length) {
-          handleGameComplete();
-        }
-      } else {
-        newCards[firstCardId].isFlipped = false
-        newCards[secondCardId].isFlipped = false
-      }
+  //     if (newCards[firstCardId].emoji === newCards[secondCardId].emoji) {
+  //       newCards[firstCardId].isMatched = true
+  //       newCards[secondCardId].isMatched = true
+  //       setMatchedPairs(prev => prev + 1)
+  //       if (matchedPairs + 1 === emojis.length) {
+  //         handleGameComplete();
+  //       }
+  //     } else {
+  //       newCards[firstCardId].isFlipped = false
+  //       newCards[secondCardId].isFlipped = false
+  //     }
 
-      setCards(newCards)
-      setFlippedCards([])
-    }, 1000)
-  }
+  //     setCards(newCards)
+  //     setFlippedCards([])
+  //   }, 1000)
+  // }
 
   const formatTime = (milliseconds: number) => {
     if (!milliseconds || milliseconds < 0) return "0:00";
