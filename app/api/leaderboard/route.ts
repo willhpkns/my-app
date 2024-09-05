@@ -3,14 +3,38 @@ import { MongoClient, ServerApiVersion } from 'mongodb';
 import { LeaderboardEntry } from '@/components/types';
 import { v4 as uuidv4 } from 'uuid';
 
-const uri = process.env.MONGODB_URI as string
-const client = new MongoClient(uri, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
+let client: MongoClient | null = null;
+
+async function getMongoClient() {
+  if (client) {
+    try {
+      // Check if the client is connected
+      await client.db().command({ ping: 1 });
+      return client;
+    } catch (error) {
+      // If ping fails, the connection is likely closed
+      await client.close();
+      client = null;
+    }
   }
-});
+
+
+  const uri = process.env.MONGODB_URI;
+  if (!uri) {
+    throw new Error('MONGODB_URI is not defined');
+  }
+
+  client = new MongoClient(uri, {
+    serverApi: {
+      version: ServerApiVersion.v1,
+      strict: true,
+      deprecationErrors: true,
+    }
+  });
+
+  await client.connect();
+  return client;
+}
 
 type GameSession = {
   id: string;
@@ -26,24 +50,18 @@ type GameSession = {
 const gameSessions: { [key: string]: GameSession } = {};
 
 export async function GET() {
-    try {
-      console.log('Attempting to connect to MongoDB...');
-      await client.connect();
-      console.log('Successfully connected to MongoDB');
-      const database = client.db("memoryGame");
-      const leaderboard = database.collection("leaderboard");
-      
-      const entries = await leaderboard.find().sort({ time: 1 }).limit(10).toArray();
-      console.log('Successfully fetched leaderboard entries');
-      return NextResponse.json(entries);
-    } catch (error) {
-      console.error('Error connecting to MongoDB or fetching leaderboard:', error);
-      return NextResponse.json({ error: 'Failed to fetch leaderboard' }, { status: 500 });
-    } finally {
-      await client.close();
-      console.log('Closed MongoDB connection');
-    }
+  try {
+    const client = await getMongoClient();
+    const database = client.db("memoryGame");
+    const leaderboard = database.collection("leaderboard");
+    
+    const entries = await leaderboard.find().sort({ time: 1 }).limit(10).toArray();
+    return NextResponse.json(entries);
+  } catch (error) {
+    console.error('Error fetching leaderboard:', error);
+    return NextResponse.json({ error: 'Failed to fetch leaderboard' }, { status: 500 });
   }
+}
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -90,9 +108,8 @@ async function recordMove(body: any) {
     return NextResponse.json({ error: 'Invalid game session' }, { status: 400 });
   }
 
-  // Prevent rapid-fire moves
   const currentTime = Date.now();
-  if (currentTime - session.lastMoveTimestamp < 500) { // 500ms cooldown
+  if (currentTime - session.lastMoveTimestamp < 500) {
     return NextResponse.json({ error: 'Moving too fast' }, { status: 429 });
   }
   session.lastMoveTimestamp = currentTime;
@@ -140,11 +157,9 @@ async function completeGame(body: any) {
   }
 
   const gameTime = endTime - session.startTime;
-  if (gameTime < 5000) { // Minimum 5 seconds game time
+  if (gameTime < 5000) {
     return NextResponse.json({ error: 'Suspicious game time' }, { status: 400 });
   }
-
-  // Additional checks can be added here
 
   return NextResponse.json({ success: true, moves: session.moves, time: gameTime });
 }
@@ -160,7 +175,7 @@ async function submitScore(body: any) {
   const gameTime = Date.now() - session.startTime;
 
   try {
-    await client.connect();
+    const client = await getMongoClient();
     const database = client.db("memoryGame");
     const leaderboard = database.collection("leaderboard");
     
@@ -179,28 +194,15 @@ async function submitScore(body: any) {
   } catch (error) {
     console.error('Error submitting score:', error);
     return NextResponse.json({ error: 'Failed to submit score' }, { status: 500 });
-  } finally {
-    await client.close();
   }
 }
 
-async function submitLeaderboardEntry(entry: LeaderboardEntry) {
-  try {
-    console.log('Attempting to connect to MongoDB...');
-    await client.connect();
-    console.log('Successfully connected to MongoDB');
-    const database = client.db("memoryGame");
-    const leaderboard = database.collection("leaderboard");
-    
-    await leaderboard.insertOne(entry);
-    console.log('Successfully inserted new leaderboard entry');
-    return NextResponse.json({ message: 'Score submitted successfully' }, { status: 201 });
-  } catch (error) {
-    console.error('Error connecting to MongoDB or inserting entry:', error);
-    return NextResponse.json({ error: 'Failed to submit score' }, { status: 500 });
-  } finally {
+// Cleanup function to close MongoDB connection when the server shuts down
+process.on('SIGINT', async () => {
+  if (client) {
     await client.close();
-    console.log('Closed MongoDB connection');
+    console.log('MongoDB connection closed');
   }
-}
+  process.exit(0);
+});
 

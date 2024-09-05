@@ -320,30 +320,43 @@ export default function MemoryGame() {
         {showLeaderboard ? "Hide Leaderboard" : "Show Leaderboard"}
       </Button>
       {showLeaderboard && (
-        <div className="w-full max-w-2xl">
-          <h2 className="text-2xl font-bold mb-2">Leaderboard</h2>
-          <table className="w-full">
-            <thead>
-              <tr>
-                <th className="text-left">Rank</th>
-                <th className="text-left">Name</th>
-                <th className="text-left">Time</th>
-                <th className="text-left">Moves</th>
-                <th className="text-left">Country</th>
-              </tr>
-            </thead>
-            <tbody>
-              {leaderboard.map((entry, index) => (
-                <tr key={index}>
-                  <td>{index + 1}</td>
-                  <td>{entry.name}</td>
-                  <td>{formatTime(entry.time)}</td>
-                  <td>{entry.moves}</td>
-                  <td>{entry.country}</td>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white text-black p-8 rounded-lg shadow-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold">Leaderboard</h2>
+              <button
+                onClick={() => setShowLeaderboard(false)}
+                className="text-gray-500 hover:text-gray-700 transition-colors duration-200"
+                aria-label="Close"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <table className="w-full">
+              <thead>
+                <tr>
+                  <th className="text-left">Rank</th>
+                  <th className="text-left">Name</th>
+                  <th className="text-left">Time</th>
+                  <th className="text-left">Moves</th>
+                  <th className="text-left">Country</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {leaderboard.map((entry, index) => (
+                  <tr key={index}>
+                    <td>{index + 1}</td>
+                    <td>{entry.name}</td>
+                    <td>{formatTime(entry.time)}</td>
+                    <td>{entry.moves}</td>
+                    <td>{entry.country}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
       <div className="absolute bottom-4 left-4 flex space-x-2">
