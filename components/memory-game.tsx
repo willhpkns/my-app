@@ -47,7 +47,6 @@ export default function MemoryGame() {
       const response = await axios.get('https://ipapi.co/json/');
       setUserCountry(response.data.country_code);
     } catch (error) {
-      console.error('Error fetching user country:', error);
       setUserCountry('🌎'); // Set a default country code in case of error
     }
   };
@@ -73,7 +72,6 @@ export default function MemoryGame() {
       setStartTime(null);
       setEndTime(null);
       setGameStarted(false);
-      console.log(`Game initialized with sessionId: ${sessionId}`);
     } catch (error) {
       console.error('Error initializing game:', error);
     }
@@ -81,7 +79,6 @@ export default function MemoryGame() {
 
   const handleCardClick = async (id: number) => {
     if (cards[id].isMatched || cards[id].isFlipped || flippedCards.length === 2 || !sessionId || isGameComplete) {
-      console.log(`Card click ignored. sessionId: ${sessionId}, flippedCards: ${flippedCards.length}, isMatched: ${cards[id].isMatched}, isFlipped: ${cards[id].isFlipped}, isGameComplete: ${isGameComplete}`);
       return;
     }
   
@@ -89,8 +86,6 @@ export default function MemoryGame() {
       setGameStarted(true);
       setStartTime(Date.now());
     }
-  
-    console.log(`Sending recordMove request. sessionId: ${sessionId}, cardId: ${id}`);
   
     try {
       const response = await axios.post('/api/leaderboard', { 
@@ -146,15 +141,12 @@ export default function MemoryGame() {
       }
     } catch (error) {
       if (axios.isAxiosError(error) && error.response) {
-        console.error('Error recording move:', error.response.data.error);
         if (error.response.status === 429) {
           // Handle rate limiting
           const timeToWait = error.response.data.timeToWait || 500;
           setTimeout(() => handleCardClick(id), timeToWait);
         } else if (error.response.status === 400) {
           // Handle invalid move
-          console.error('Invalid move:', error.response.data.error);
-          // Refresh the game state
           initializeGame();
         }
       } else {
@@ -164,18 +156,16 @@ export default function MemoryGame() {
   };
 
   const handleGameComplete = async () => {
-    console.log("Game completed!");
     setIsGameComplete(true);
     setShowCongratulationsModal(true);
     const currentTime = Date.now();
     setEndTime(currentTime);
     try {
-      const response = await axios.post('/api/leaderboard', { 
+      await axios.post('/api/leaderboard', { 
         action: 'completeGame', 
         sessionId, 
         endTime: currentTime 
       });
-      console.log('Game completion response:', response.data);
     } catch (error) {
       console.error('Error completing game:', error);
     }
@@ -259,14 +249,6 @@ export default function MemoryGame() {
     }
     setShowNameModal(false);
   }
-
-  useEffect(() => {
-    console.log('Current cards state:', cards);
-  }, [cards]);
-
-  useEffect(() => {
-    console.log('Current flippedCards:', flippedCards);
-  }, [flippedCards]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4 relative">
