@@ -38,7 +38,13 @@ export default function MemoryGame() {
     window.addEventListener('resize', updateWindowSize)
     return () => window.removeEventListener('resize', updateWindowSize)
   }, [])
-
+  
+  const formatTime = (milliseconds: number): string => {
+    const totalSeconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }
   const updateWindowSize = () => {
     setWindowSize({ width: window.innerWidth, height: window.innerHeight })
   }
@@ -132,30 +138,29 @@ export default function MemoryGame() {
   }, [cards, flippedCards, sessionId, isGameComplete, gameStarted, emojis.length]);
 
   const handleGameComplete = useCallback(async () => {
+    if (isGameComplete) return; // Prevent multiple calls
+  
     setIsGameComplete(true);
     setShowCongratulationsModal(true);
     const currentTime = Date.now();
     setEndTime(currentTime);
-    try {
-      await axios.post('/api/leaderboard', { 
-        action: 'completeGame', 
-        sessionId, 
-        endTime: currentTime,
-        moves,
-      });
-    } catch (error) {
-      console.error('Error completing game:', error);
+    
+    if (sessionId) {
+      try {
+        await axios.post('/api/leaderboard', { 
+          action: 'completeGame', 
+          sessionId, 
+          endTime: currentTime,
+          moves,
+        });
+      } catch (error) {
+        console.error('Error completing game:', error);
+      }
+    } else {
+      console.error('No sessionId available');
     }
     setGameStarted(false);
-  }, [sessionId, moves]);
-
-  const formatTime = (milliseconds: number) => {
-    if (!milliseconds || milliseconds < 0) return "0:00";
-    const seconds = Math.floor(milliseconds / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  }
+  }, [sessionId, moves, isGameComplete]);
 
   const handleTitleClick = useCallback(() => {
     const newCount = titleClickCount + 1
@@ -191,7 +196,7 @@ export default function MemoryGame() {
     }
   }
 
-  const submitToLeaderboard = () => {
+  const submitToLeaderboard = async (name: string) => {
     if (hasSubmitted) {
       alert("You've already submitted your score for this game!")
       return
@@ -202,29 +207,36 @@ export default function MemoryGame() {
       return
     }
 
-    setShowNameModal(true);
+    if (!sessionId) {
+      alert("Unable to submit score. Please try starting a new game.")
+      return
+    }
+
+    setIsSubmitting(true);
+    try {
+      await axios.post('/api/leaderboard', { 
+        action: 'submitScore', 
+        sessionId, 
+        name, 
+        country: userCountry 
+      });
+      await loadLeaderboard();
+      setShowLeaderboard(true);
+      setHasSubmitted(true);
+    } catch (error) {
+      console.error('Error submitting to leaderboard:', error);
+      alert('Failed to submit score. Please try again.');
+    }
+    setIsSubmitting(false);
+    setShowNameModal(false);
   }
 
-  const handleNameSubmit = async (name: string) => {
-    if (name && !isSubmitting && sessionId) {
-      setIsSubmitting(true);
-      try {
-        await axios.post('/api/leaderboard', { 
-          action: 'submitScore', 
-          sessionId, 
-          name, 
-          country: userCountry 
-        });
-        await loadLeaderboard();
-        setShowLeaderboard(true);
-        setHasSubmitted(true);
-      } catch (error) {
-        console.error('Error submitting to leaderboard:', error);
-        alert('Failed to submit score. Please try again.');
-      }
-      setIsSubmitting(false);
+  const handleNameSubmit = () => {
+    const inputElement = document.querySelector('input[type="text"]') as HTMLInputElement;
+    const name = inputElement?.value || '';
+    if (name && !isSubmitting) {
+      submitToLeaderboard(name);
     }
-    setShowNameModal(false);
   }
 
   return (
@@ -266,7 +278,7 @@ export default function MemoryGame() {
             <div className="flex justify-center space-x-4">
               {!hasSubmitted && !isEasterEggActivated && (
                 <Button 
-                  onClick={submitToLeaderboard}
+                  onClick={() => setShowNameModal(true)}
                   className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-full text-lg transition-all duration-200 hover:scale-105 hover:shadow-lg"
                 >
                   Submit to Leaderboard
@@ -392,17 +404,14 @@ export default function MemoryGame() {
               placeholder="Your name"
               onKeyPress={(e) => {
                 if (e.key === 'Enter') {
-                  handleNameSubmit((e.target as HTMLInputElement).value);
+                  handleNameSubmit();
                 }
               }}
             />
             <div className="flex justify-end space-x-2">
               <Button onClick={() => setShowNameModal(false)}>Cancel</Button>
               <Button 
-                onClick={() => {
-                  const inputElement = document.querySelector('input[type="text"]') as HTMLInputElement;
-                  handleNameSubmit(inputElement?.value || '');
-                }}
+                onClick={handleNameSubmit}
                 disabled={isSubmitting}
               >
                 {isSubmitting ? 'Submitting...' : 'Submit'}

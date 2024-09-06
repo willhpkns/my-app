@@ -42,6 +42,7 @@ type GameSession = {
   cards: string[];
   moves: number;
   completed: boolean;
+  endTime?: number; // Add this line
 };
 
 const gameSessions: { [key: string]: GameSession } = {};
@@ -104,18 +105,20 @@ async function completeGame(body: any) {
   }
 
   if (session.completed) {
-    console.error('Game already completed:', sessionId);
-    return NextResponse.json({ error: 'Game already completed' }, { status: 400 });
+    console.log('Game already completed:', sessionId);
+    return NextResponse.json({ success: true, moves: session.moves, time: session.endTime! - session.startTime });
   }
 
-  session.completed = true;
-  session.moves = moves;
   const gameTime = endTime - session.startTime;
 
   if (gameTime < 5000) {
     console.error('Suspicious game time:', gameTime);
     return NextResponse.json({ error: 'Suspicious game time' }, { status: 400 });
   }
+
+  session.completed = true;
+  session.moves = moves;
+  session.endTime = endTime; // Store the endTime instead of gameTime
 
   console.log('Game completed successfully:', { sessionId, moves, gameTime });
   return NextResponse.json({ success: true, moves: session.moves, time: gameTime });
