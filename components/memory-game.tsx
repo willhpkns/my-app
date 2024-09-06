@@ -210,7 +210,7 @@ export default function MemoryGame() {
         sessionId, 
         name, 
         country: userCountry,
-        moves: finalGameStats.moves,
+        moves: moves,
         time: finalGameStats.time,
       });
       await loadLeaderboard();
@@ -266,7 +266,7 @@ export default function MemoryGame() {
             <h2 className="text-3xl font-bold mb-4">
               {isEasterEggActivated ? "Stop cheating!" : "Congratulations!"}
             </h2>
-            <p className="text-xl mb-2">You&apos;ve completed the game in {finalGameStats.moves} moves!</p>
+            <p className="text-xl mb-2">You&apos;ve completed the game in {moves} moves!</p>
             <p className="text-xl mb-6">Time: {formatTime(finalGameStats.time)}</p>
             <div className="flex justify-center space-x-4">
               {!hasSubmitted && !isEasterEggActivated && (
