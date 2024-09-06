@@ -176,45 +176,28 @@ async function completeGame(body: any) {
 }
 
 async function submitScore(body: any) {
-  const { sessionId, name, country } = body;
+  const { sessionId, name, country, moves, time } = body;
   
-  if (!sessionId || !name) {
-    console.error('Missing sessionId or name:', body);
-    return NextResponse.json({ error: 'Missing sessionId or name' }, { status: 400 });
+  if (!sessionId || !name || moves === undefined || time === undefined) {
+    console.error('Missing required fields:', body);
+    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
   try {
     const client = await getMongoClient();
     const database = client.db("memoryGame");
-    const sessions = database.collection("sessions");
     const leaderboard = database.collection("leaderboard");
-
-    const session = await sessions.findOne({ id: sessionId });
-
-    if (!session) {
-      console.error('Session not found:', sessionId);
-      return NextResponse.json({ error: 'Invalid game session' }, { status: 400 });
-    }
-
-    if (!session.endTime) {
-      console.error('Game not completed for session:', sessionId);
-      return NextResponse.json({ error: 'Game not completed' }, { status: 400 });
-    }
-
-    const gameTime = session.endTime - session.startTime;
 
     const entry: LeaderboardEntry = {
       name,
-      time: gameTime,
-      moves: session.moves,
+      time,
+      moves,
       country: country || '🌎',
       date: new Date().toISOString(),
       sessionId,
-      endTime: session.endTime,
     };
     
     await leaderboard.insertOne(entry);
-    await sessions.deleteOne({ id: sessionId }); // Clean up the session
 
     console.log('Score submitted successfully for session:', sessionId);
     return NextResponse.json({ message: 'Score submitted successfully' }, { status: 201 });

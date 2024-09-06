@@ -12,5 +12,4 @@ export type CardType = {
     country: string;
     date: string;
     sessionId: string;
-    endTime: number;
   };

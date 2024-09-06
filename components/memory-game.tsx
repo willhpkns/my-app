@@ -29,6 +29,7 @@ export default function MemoryGame() {
   const [showCongratulationsModal, setShowCongratulationsModal] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [finalGameStats, setFinalGameStats] = useState({ moves: 0, time: 0 });
 
   useEffect(() => {
     initializeGame()
@@ -137,31 +138,20 @@ export default function MemoryGame() {
     }
   }, [cards, flippedCards, sessionId, isGameComplete, gameStarted, emojis.length]);
 
-  const handleGameComplete = useCallback(async () => {
-    if (isGameComplete) return; // Prevent multiple calls
-  
-    setIsGameComplete(true);
-    setShowCongratulationsModal(true);
+  const handleGameComplete = useCallback(() => {
+    if (isGameComplete) return;
+
     const currentTime = Date.now();
+    const finalTime = currentTime - startTime!;
+    const finalMoves = moves;
+
+    setFinalGameStats({ moves: finalMoves, time: finalTime });
+
+    setIsGameComplete(true);
     setEndTime(currentTime);
-    
-    if (sessionId) {
-      try {
-        await axios.post('/api/leaderboard', { 
-          action: 'completeGame', 
-          sessionId, 
-          endTime: currentTime,
-          moves,
-          time: currentTime - startTime!, // Add this line
-        });
-      } catch (error) {
-        console.error('Error completing game:', error);
-      }
-    } else {
-      console.error('No sessionId available');
-    }
+    setShowCongratulationsModal(true);
     setGameStarted(false);
-  }, [sessionId, moves, isGameComplete, startTime]); // Add startTime to dependencies
+  }, [isGameComplete, startTime, moves]);
 
   const handleTitleClick = useCallback(() => {
     const newCount = titleClickCount + 1
@@ -220,8 +210,8 @@ export default function MemoryGame() {
         sessionId, 
         name, 
         country: userCountry,
-        moves, // Add this line
-        time: endTime! - startTime!, // Add this line
+        moves: finalGameStats.moves,
+        time: finalGameStats.time,
       });
       await loadLeaderboard();
       setShowLeaderboard(true);
@@ -276,8 +266,8 @@ export default function MemoryGame() {
             <h2 className="text-3xl font-bold mb-4">
               {isEasterEggActivated ? "Stop cheating!" : "Congratulations!"}
             </h2>
-            <p className="text-xl mb-2">You&apos;ve completed the game in {moves} moves!</p>
-            <p className="text-xl mb-6">Time: {formatTime(endTime! - startTime!)}</p>
+            <p className="text-xl mb-2">You&apos;ve completed the game in {finalGameStats.moves} moves!</p>
+            <p className="text-xl mb-6">Time: {formatTime(finalGameStats.time)}</p>
             <div className="flex justify-center space-x-4">
               {!hasSubmitted && !isEasterEggActivated && (
                 <Button 
