@@ -88,7 +88,11 @@ export default function MemoryGame() {
       setStartTime(Date.now());
     }
   
-    setMoves(prevMoves => prevMoves + 1);
+    // Increment moves only when flipping the second card
+    if (flippedCards.length === 1) {
+      setMoves(prevMoves => prevMoves + 1);
+    }
+    
     setCards(prevCards => prevCards.map(card => 
       card.id === id ? { ...card, isFlipped: true } : card
     ));
@@ -133,19 +137,14 @@ export default function MemoryGame() {
     const currentTime = Date.now();
     setEndTime(currentTime);
     try {
-      const response = await axios.post('/api/leaderboard', { 
+      await axios.post('/api/leaderboard', { 
         action: 'completeGame', 
         sessionId, 
         endTime: currentTime,
         moves,
       });
-      console.log('Game completed successfully:', response.data);
     } catch (error) {
       console.error('Error completing game:', error);
-      // Add more detailed error logging
-      if (axios.isAxiosError(error) && error.response) {
-        console.error('Response data:', error.response.data);
-      }
     }
     setGameStarted(false);
   }, [sessionId, moves]);
@@ -239,8 +238,8 @@ export default function MemoryGame() {
           initialVelocityX={20}
           initialVelocityY={20}
           confettiSource={{
-            x: window.innerWidth,
-            y: window.innerHeight,
+            x: windowSize.width,
+            y: windowSize.height,
             w: 0,
             h: 0
           }}
