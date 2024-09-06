@@ -8,32 +8,37 @@ let client: MongoClient | null = null;
 async function getMongoClient() {
   if (client) {
     try {
-      // Check if the client is connected
       await client.db().command({ ping: 1 });
       return client;
     } catch (error) {
-      // If ping fails, the connection is likely closed
+      console.error('Error pinging MongoDB:', error);
       await client.close();
       client = null;
     }
   }
 
-
   const uri = process.env.MONGODB_URI;
   if (!uri) {
+    console.error('MONGODB_URI is not defined');
     throw new Error('MONGODB_URI is not defined');
   }
 
-  client = new MongoClient(uri, {
-    serverApi: {
-      version: ServerApiVersion.v1,
-      strict: true,
-      deprecationErrors: true,
-    }
-  });
+  try {
+    client = new MongoClient(uri, {
+      serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
+      }
+    });
 
-  await client.connect();
-  return client;
+    await client.connect();
+    console.log('Connected to MongoDB');
+    return client;
+  } catch (error) {
+    console.error('Error connecting to MongoDB:', error);
+    throw error;
+  }
 }
 
 type GameSession = {
@@ -47,14 +52,31 @@ type GameSession = {
 
 const gameSessions: { [key: string]: GameSession } = {};
 
-export async function GET() {
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  });
+}
+
+export async function GET(request: Request) {
   try {
     const client = await getMongoClient();
     const database = client.db("memoryGame");
     const leaderboard = database.collection("leaderboard");
     
     const entries = await leaderboard.find().sort({ time: 1 }).limit(10).toArray();
-    return NextResponse.json(entries);
+    return NextResponse.json(entries, {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+      },
+    });
   } catch (error) {
     console.error('Error fetching leaderboard:', error);
     return NextResponse.json({ error: 'Failed to fetch leaderboard' }, { status: 500 });
@@ -62,18 +84,24 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const body = await request.json();
-  const { action, sessionId } = body;
+  try {
+    const body = await request.json();
+    console.log('Received POST request with body:', body);
+    const { action, sessionId } = body;
 
-  switch (action) {
-    case 'initializeGame':
-      return initializeGame(body);
-    case 'completeGame':
-      return completeGame(body);
-    case 'submitScore':
-      return submitScore(body);
-    default:
-      return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    switch (action) {
+      case 'initializeGame':
+        return initializeGame(body);
+      case 'completeGame':
+        return completeGame(body);
+      case 'submitScore':
+        return submitScore(body);
+      default:
+        return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    }
+  } catch (error) {
+    console.error('Error in POST handler:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
 
@@ -95,6 +123,10 @@ async function initializeGame(body: any) {
 
 async function completeGame(body: any) {
   const { sessionId, endTime, moves } = body;
+  if (!sessionId || !endTime || moves === undefined) {
+    console.error('Invalid request body:', body);
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+  }
   console.log('Received completeGame request:', { sessionId, endTime, moves });
 
   const session = gameSessions[sessionId];
