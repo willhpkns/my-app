@@ -52,7 +52,7 @@ export default function MemoryGame() {
     }
   };
 
-  const initializeGame = async () => {
+  const initializeGame = useCallback(async () => {
     try {
       const response = await axios.post('/api/leaderboard', {
         action: 'initializeGame',
@@ -76,9 +76,9 @@ export default function MemoryGame() {
     } catch (error) {
       console.error('Error initializing game:', error);
     }
-  }
+  }, []);
 
-  const handleCardClick = async (id: number) => {
+  const handleCardClick = useCallback((id: number) => {
     if (cards[id].isMatched || cards[id].isFlipped || flippedCards.length === 2 || !sessionId || isGameComplete) {
       return;
     }
@@ -88,80 +88,67 @@ export default function MemoryGame() {
       setStartTime(Date.now());
     }
   
-    try {
-      const response = await axios.post('/api/leaderboard', { 
-        action: 'recordMove', 
-        sessionId, 
-        cardId: id 
-      });
+    setMoves(prevMoves => prevMoves + 1);
+    setCards(prevCards => prevCards.map(card => 
+      card.id === id ? { ...card, isFlipped: true } : card
+    ));
+    setFlippedCards(prevFlipped => [...prevFlipped, id]);
   
-      const { moves, matchedPairs, flippedCards: serverFlippedCards, completed, revealedCards, matchMade } = response.data;
-  
-      setMoves(moves);
-      setMatchedPairs(matchedPairs);
-  
-      // Update the clicked card
-      setCards(prevCards => prevCards.map(card => 
-        card.id === id ? { ...card, isFlipped: true, emoji: revealedCards[id] } : card
-      ));
-  
-      // Update flipped cards
-      setFlippedCards(prevFlipped => [...prevFlipped, id]);
-  
-      // If this is the second card flipped
-      if (flippedCards.length === 1) {
-        const [firstCardId] = flippedCards;
-        
-        setTimeout(() => {
-          if (matchMade) {
-            // Match found
-            setCards(prevCards => prevCards.map(card => 
-              card.id === firstCardId || card.id === id
-                ? { ...card, isMatched: true, isFlipped: true }
-                : card
-            ));
-          } else {
-            // No match
-            setCards(prevCards => prevCards.map(card => 
-              card.id === firstCardId || card.id === id
-                ? { ...card, isFlipped: false }
-                : card
-            ));
-          }
-          setFlippedCards([]);
-  
-          // Check if the game is completed after updating the cards
-          if (matchedPairs === emojis.length) {
+    if (flippedCards.length === 1) {
+      const [firstCardId] = flippedCards;
+      const firstCard = cards[firstCardId];
+      const secondCard = cards[id];
+
+      if (firstCard.emoji === secondCard.emoji) {
+        // Match found
+        setCards(prevCards => prevCards.map(card => 
+          card.id === firstCardId || card.id === id
+            ? { ...card, isMatched: true, isFlipped: true }
+            : card
+        ));
+        setMatchedPairs(prevPairs => {
+          const newPairs = prevPairs + 1;
+          if (newPairs === emojis.length) {
             handleGameComplete();
           }
+          return newPairs;
+        });
+      } else {
+        // No match
+        setTimeout(() => {
+          setCards(prevCards => prevCards.map(card => 
+            card.id === firstCardId || card.id === id
+              ? { ...card, isFlipped: false }
+              : card
+          ));
         }, 1000);
       }
-  
-      if (completed) {
-        handleGameComplete();
-      }
-    } catch (error) {
-      console.error('Error handling card click:', error);
-      // Optionally, you can add a user-friendly error message here
+      setFlippedCards([]);
     }
-  };
+  }, [cards, flippedCards, sessionId, isGameComplete, gameStarted, emojis.length]);
 
-  const handleGameComplete = async () => {
+  const handleGameComplete = useCallback(async () => {
     setIsGameComplete(true);
     setShowCongratulationsModal(true);
     const currentTime = Date.now();
     setEndTime(currentTime);
     try {
-      await axios.post('/api/leaderboard', { 
+      const response = await axios.post('/api/leaderboard', { 
         action: 'completeGame', 
         sessionId, 
-        endTime: currentTime 
+        endTime: currentTime,
+        moves,
       });
+      console.log('Game completed successfully:', response.data);
     } catch (error) {
       console.error('Error completing game:', error);
+      // Add more detailed error logging
+      if (axios.isAxiosError(error) && error.response) {
+        console.error('Response data:', error.response.data);
+      }
     }
     setGameStarted(false);
-  }
+  }, [sessionId, moves]);
 
   const formatTime = (milliseconds: number) => {
     if (!milliseconds || milliseconds < 0) return "0:00";
@@ -252,8 +239,8 @@ export default function MemoryGame() {
           initialVelocityX={20}
           initialVelocityY={20}
           confettiSource={{
-            x: windowSize.width,
-            y: windowSize.height,
+            x: window.innerWidth,
+            y: window.innerHeight,
             w: 0,
             h: 0
           }}

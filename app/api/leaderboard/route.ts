@@ -40,11 +40,8 @@ type GameSession = {
   id: string;
   startTime: number;
   cards: string[];
-  flippedCards: number[];
-  matchedPairs: number;
   moves: number;
   completed: boolean;
-  lastMoveTimestamp: number;
 };
 
 const gameSessions: { [key: string]: GameSession } = {};
@@ -70,8 +67,6 @@ export async function POST(request: Request) {
   switch (action) {
     case 'initializeGame':
       return initializeGame(body);
-    case 'recordMove':
-      return recordMove(body);
     case 'completeGame':
       return completeGame(body);
     case 'submitScore':
@@ -90,84 +85,39 @@ async function initializeGame(body: any) {
     id: sessionId,
     startTime: Date.now(),
     cards: shuffledEmojis,
-    flippedCards: [],
-    matchedPairs: 0,
     moves: 0,
     completed: false,
-    lastMoveTimestamp: Date.now(),
   };
 
   return NextResponse.json({ sessionId, cards: shuffledEmojis });
 }
 
-async function recordMove(body: any) {
-  const { sessionId, cardId } = body;
-  const session = gameSessions[sessionId];
-
-  if (!session) {
-    return NextResponse.json({ error: 'Invalid game session' }, { status: 400 });
-  }
-
-  // Remove the rate limiting check
-  // const currentTime = Date.now();
-  // if (currentTime - session.lastMoveTimestamp < 500) {
-  //   return NextResponse.json({ error: 'Moving too fast', timeToWait: 500 - (currentTime - session.lastMoveTimestamp) }, { status: 429 });
-  // }
-  session.lastMoveTimestamp = Date.now();
-
-  if (session.flippedCards.includes(cardId)) {
-    return NextResponse.json({ error: 'Card already flipped' }, { status: 400 });
-  }
-
-  session.flippedCards.push(cardId);
-  session.moves++;
-
-  let matchMade = false;
-  if (session.flippedCards.length === 2) {
-    const [firstCardId, secondCardId] = session.flippedCards;
-    if (session.cards[firstCardId] === session.cards[secondCardId]) {
-      session.matchedPairs++;
-      matchMade = true;
-    }
-    session.flippedCards = []; // Reset flipped cards after each pair
-  }
-
-  const revealedCards = session.cards.map((emoji, index) => {
-    if (index === cardId || (matchMade && (index === session.flippedCards[0] || index === session.flippedCards[1]))) {
-      return emoji;
-    }
-    return null;
-  });
-
-  return NextResponse.json({
-    moves: session.moves,
-    matchedPairs: session.matchedPairs,
-    flippedCards: session.flippedCards,
-    completed: session.completed,
-    revealedCards: revealedCards,
-    matchMade: matchMade,
-  });
-}
-
 async function completeGame(body: any) {
-  const { sessionId, endTime } = body;
+  const { sessionId, endTime, moves } = body;
+  console.log('Received completeGame request:', { sessionId, endTime, moves });
+
   const session = gameSessions[sessionId];
 
   if (!session) {
+    console.error('Invalid session:', sessionId);
     return NextResponse.json({ error: 'Invalid game session' }, { status: 400 });
   }
 
   if (session.completed) {
+    console.error('Game already completed:', sessionId);
     return NextResponse.json({ error: 'Game already completed' }, { status: 400 });
   }
 
   session.completed = true;
+  session.moves = moves;
   const gameTime = endTime - session.startTime;
 
   if (gameTime < 5000) {
+    console.error('Suspicious game time:', gameTime);
     return NextResponse.json({ error: 'Suspicious game time' }, { status: 400 });
   }
 
+  console.log('Game completed successfully:', { sessionId, moves, gameTime });
   return NextResponse.json({ success: true, moves: session.moves, time: gameTime });
 }
 
