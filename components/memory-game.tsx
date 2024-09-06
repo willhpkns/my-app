@@ -152,6 +152,7 @@ export default function MemoryGame() {
           sessionId, 
           endTime: currentTime,
           moves,
+          time: currentTime - startTime!, // Add this line
         });
       } catch (error) {
         console.error('Error completing game:', error);
@@ -160,7 +161,7 @@ export default function MemoryGame() {
       console.error('No sessionId available');
     }
     setGameStarted(false);
-  }, [sessionId, moves, isGameComplete]);
+  }, [sessionId, moves, isGameComplete, startTime]); // Add startTime to dependencies
 
   const handleTitleClick = useCallback(() => {
     const newCount = titleClickCount + 1
@@ -218,7 +219,9 @@ export default function MemoryGame() {
         action: 'submitScore', 
         sessionId, 
         name, 
-        country: userCountry 
+        country: userCountry,
+        moves, // Add this line
+        time: endTime! - startTime!, // Add this line
       });
       await loadLeaderboard();
       setShowLeaderboard(true);
