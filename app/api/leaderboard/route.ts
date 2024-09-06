@@ -42,7 +42,7 @@ type GameSession = {
   cards: string[];
   moves: number;
   completed: boolean;
-  endTime?: number; // Add this line
+  endTime?: number;
 };
 
 const gameSessions: { [key: string]: GameSession } = {};
@@ -106,7 +106,9 @@ async function completeGame(body: any) {
 
   if (session.completed) {
     console.log('Game already completed:', sessionId);
-    return NextResponse.json({ success: true, moves: session.moves, time: session.endTime! - session.startTime });
+    // Use a fallback value if session.endTime is undefined
+    const gameTime = session.endTime ? session.endTime - session.startTime : 0;
+    return NextResponse.json({ success: true, moves: session.moves, time: gameTime });
   }
 
   const gameTime = endTime - session.startTime;
@@ -118,7 +120,7 @@ async function completeGame(body: any) {
 
   session.completed = true;
   session.moves = moves;
-  session.endTime = endTime; // Store the endTime instead of gameTime
+  session.endTime = endTime;
 
   console.log('Game completed successfully:', { sessionId, moves, gameTime });
   return NextResponse.json({ success: true, moves: session.moves, time: gameTime });
@@ -132,7 +134,11 @@ async function submitScore(body: any) {
     return NextResponse.json({ error: 'Invalid game session' }, { status: 400 });
   }
 
-  const gameTime = Date.now() - session.startTime;
+  if (!session.endTime) {
+    return NextResponse.json({ error: 'Game not completed' }, { status: 400 });
+  }
+
+  const gameTime = session.endTime - session.startTime;
 
   try {
     const client = await getMongoClient();
@@ -146,6 +152,7 @@ async function submitScore(body: any) {
       country: country || '🌎',
       date: new Date().toISOString(),
       sessionId,
+      endTime: session.endTime, // This line is now safe because we've checked for undefined
     };
     
     await leaderboard.insertOne(entry);
