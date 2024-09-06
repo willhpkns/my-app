@@ -11,4 +11,5 @@ export type CardType = {
     moves: number;
     country: string;
     date: string;
+    sessionId: string;
   };

@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Memory Game",
+  title: "Will's Memory Game",
   description: "A fun memory game with emojis",
   icons: {
     icon: "/favicon.ico", // or '/favicon.png'

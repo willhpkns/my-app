@@ -142,6 +142,7 @@ async function submitScore(body: any) {
       moves: session.moves,
       country: country || '🌎',
       date: new Date().toISOString(),
+      sessionId,
     };
     
     await leaderboard.insertOne(entry);
