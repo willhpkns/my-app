@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 import { MongoClient, ServerApiVersion } from 'mongodb';
 import { LeaderboardEntry } from '@/components/types';
 import { v4 as uuidv4 } from 'uuid';
+import crypto from 'crypto';
+
+// Remove this debug log at the top of the file
+// console.log('SECRET_PASSPHRASE:', process.env.SECRET_PASSPHRASE);
 
 let client: MongoClient | null = null;
 
@@ -104,28 +108,48 @@ export async function POST(request: Request) {
 }
 
 async function initializeGame(body: any) {
-  const { emojis } = body;
+  const { encryptedEmojis } = body;
   const sessionId = uuidv4();
-  const shuffledEmojis = [...emojis, ...emojis].sort(() => Math.random() - 0.5);
   
-  const session: GameSession = {
-    id: sessionId,
-    startTime: Date.now(),
-    cards: shuffledEmojis,
-    moves: 0,
-    completed: false,
-  };
-
   try {
+    const secretPassphrase = process.env.SECRET_PASSPHRASE;
+    if (!secretPassphrase) {
+      throw new Error('SECRET_PASSPHRASE is not defined');
+    }
+
+    // Remove these console.logs
+    // console.log('Attempting to decrypt with passphrase:', secretPassphrase);
+    // console.log('Encrypted emojis:', encryptedEmojis);
+
+    if (!encryptedEmojis) {
+      throw new Error('Encrypted emojis are missing');
+    }
+
+    const decryptedEmojis = decryptData(encryptedEmojis, secretPassphrase);
+    // Remove this console.log
+    // console.log('Decrypted emojis:', decryptedEmojis);
+
+    const emojis = JSON.parse(decryptedEmojis);
+    const shuffledEmojis = [...emojis, ...emojis].sort(() => Math.random() - 0.5);
+    
+    const session: GameSession = {
+      id: sessionId,
+      startTime: Date.now(),
+      cards: shuffledEmojis,
+      moves: 0,
+      completed: false,
+    };
+
     const client = await getMongoClient();
     const database = client.db("memoryGame");
     const sessions = database.collection("sessions");
     await sessions.insertOne(session);
 
-    return NextResponse.json({ sessionId, cards: shuffledEmojis });
+    const encryptedCards = encryptData(JSON.stringify(shuffledEmojis), secretPassphrase);
+    return NextResponse.json({ sessionId, encryptedCards });
   } catch (error) {
-    console.error('Error initializing game:', error);
-    return NextResponse.json({ error: 'Failed to initialize game' }, { status: 500 });
+    console.error('Error in initializeGame:', error);
+    throw error;
   }
 }
 
@@ -214,4 +238,45 @@ process.on('SIGINT', async () => {
   }
   process.exit(0);
 });
+
+// Add these utility functions for encryption and decryption
+function deriveKey(password: string): Buffer {
+  return crypto.pbkdf2Sync(password, 'salt', 100000, 32, 'sha256');
+}
+
+function encryptData(data: string, password: string): string {
+  const key = deriveKey(password);
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  let encrypted = cipher.update(data, 'utf8', 'base64');
+  encrypted += cipher.final('base64');
+  const authTag = cipher.getAuthTag();
+  return iv.toString('base64') + ':' + encrypted + ':' + authTag.toString('base64');
+}
+
+function decryptData(encryptedData: string, password: string): string {
+  try {
+    // Remove all console.logs from this function
+    const key = deriveKey(password);
+    const [ivBase64, encrypted, authTagBase64] = encryptedData.split(':');
+    
+    if (!ivBase64 || !encrypted || !authTagBase64) {
+      throw new Error('Invalid encrypted data format');
+    }
+    
+    const iv = Buffer.from(ivBase64, 'base64');
+    const authTag = Buffer.from(authTagBase64, 'base64');
+    
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(authTag);
+    
+    let decrypted = decipher.update(encrypted, 'base64', 'utf8');
+    decrypted += decipher.final('utf8');
+    
+    return decrypted;
+  } catch (error) {
+    console.error('Error in decryptData');
+    throw error;
+  }
+}
 

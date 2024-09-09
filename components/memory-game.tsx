@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import Confetti from 'react-confetti'
 import { CardType, LeaderboardEntry } from '@/components/types'
+import { Buffer } from 'buffer';
 
 
 const emojis = ["🐶", "🐱", "🐭", "🐸", "🐰", "🐵", "🐻", "🐼", ]
@@ -59,15 +60,102 @@ export default function MemoryGame() {
     }
   };
 
+  async function deriveKey(password: string): Promise<CryptoKey> {
+    const encoder = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(password),
+      { name: 'PBKDF2' },
+      false,
+      ['deriveBits', 'deriveKey']
+    );
+    return crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: encoder.encode('salt'),
+        iterations: 100000,
+        hash: 'SHA-256'
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+  }
+
+  async function encryptData(data: string, password: string): Promise<string> {
+    try {
+      const key = await deriveKey(password);
+      const encoder = new TextEncoder();
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const encoded = encoder.encode(data);
+      const encrypted = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv: iv },
+        key,
+        encoded
+      );
+      const encryptedArray = new Uint8Array(encrypted);
+      const authTag = encryptedArray.slice(-16);
+      const encryptedData = encryptedArray.slice(0, -16);
+      
+      return btoa(String.fromCharCode.apply(null, iv as unknown as number[]))
+        + ':' + btoa(String.fromCharCode.apply(null, encryptedData as unknown as number[]))
+        + ':' + btoa(String.fromCharCode.apply(null, authTag as unknown as number[]));
+    } catch (error) {
+      console.error('Error in encryptData');
+      throw new Error('Encryption failed');
+    }
+  }
+
+  async function decryptData(encryptedData: string, password: string): Promise<string> {
+    try {
+      const key = await deriveKey(password);
+      const [ivBase64, dataBase64, authTagBase64] = encryptedData.split(':');
+      
+      if (!ivBase64 || !dataBase64 || !authTagBase64) {
+        throw new Error('Invalid encrypted data format');
+      }
+      
+      const iv = Uint8Array.from(atob(ivBase64), c => c.charCodeAt(0));
+      const data = Uint8Array.from(atob(dataBase64), c => c.charCodeAt(0));
+      const authTag = Uint8Array.from(atob(authTagBase64), c => c.charCodeAt(0));
+      
+      const combinedData = new Uint8Array(data.length + authTag.length);
+      combinedData.set(data);
+      combinedData.set(authTag, data.length);
+      
+      const decrypted = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: iv },
+        key,
+        combinedData
+      );
+      
+      return new TextDecoder().decode(decrypted);
+    } catch (error) {
+      console.error('Error in decryptData');
+      throw new Error('Decryption failed');
+    }
+  }
+
   const initializeGame = useCallback(async () => {
     try {
+      const password = process.env.NEXT_PUBLIC_SECRET_PASSPHRASE;
+      if (!password) {
+        throw new Error('NEXT_PUBLIC_SECRET_PASSPHRASE is not defined');
+      }
+      const emojisString = JSON.stringify(emojis);
+      const encryptedEmojis = await encryptData(emojisString, password);
+
       const response = await axios.post('/api/leaderboard', {
         action: 'initializeGame',
-        emojis: emojis,
+        encryptedEmojis: encryptedEmojis,
       });
-      const { sessionId, cards } = response.data;
+
+      const { sessionId, encryptedCards } = response.data;
+      const decryptedCards = JSON.parse(await decryptData(encryptedCards, password));
+
       setSessionId(sessionId);
-      setCards(cards.map((emoji: string, index: number) => ({
+      setCards(decryptedCards.map((emoji: string, index: number) => ({
         id: index,
         emoji,
         isFlipped: false,
@@ -81,10 +169,10 @@ export default function MemoryGame() {
       setEndTime(null);
       setGameStarted(false);
     } catch (error) {
-      console.error('Error initializing game:', error);
+      console.error('Error initializing game');
+      // You might want to set an error state here to display to the user
     }
   }, []);
-
   const handleCardClick = useCallback((id: number) => {
     if (cards[id].isMatched || cards[id].isFlipped || flippedCards.length === 2 || !sessionId || isGameComplete) {
       return;
