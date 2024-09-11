@@ -8,6 +8,13 @@ import { CardType, LeaderboardEntry } from "@/components/types";
 
 const emojis = ["🐶", "🐱", "🐭", "🐸", "🐰", "🐵", "🐻", "🐼"];
 
+const formatTime = (milliseconds: number): string => {
+  const totalSeconds = Math.floor(milliseconds / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+};
+
 const MemoryGame = () => {
   const [cards, setCards] = useState<CardType[]>([]);
   const [flippedCards, setFlippedCards] = useState<number[]>([]);
@@ -39,22 +46,6 @@ const MemoryGame = () => {
     }
   };
 
-  useEffect(() => {
-    initializeGame();
-    updateWindowSize();
-    loadLeaderboard();
-    getUserCountry();
-    window.addEventListener("resize", updateWindowSize);
-    return () => window.removeEventListener("resize", updateWindowSize);
-  }, []);
-
-  const formatTime = (milliseconds: number): string => {
-    const totalSeconds = Math.floor(milliseconds / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
-  };
-
   const updateWindowSize = () => {
     setWindowSize({ width: window.innerWidth, height: window.innerHeight });
   };
@@ -68,7 +59,7 @@ const MemoryGame = () => {
     }
   };
 
-  async function deriveKey(password: string): Promise<CryptoKey> {
+  const deriveKey = useCallback(async (password: string): Promise<CryptoKey> => {
     const encoder = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey(
       "raw",
@@ -89,9 +80,9 @@ const MemoryGame = () => {
       false,
       ["encrypt", "decrypt"]
     );
-  }
+  }, []);
 
-  async function encryptData(data: string, password: string): Promise<string> {
+  const encryptData = useCallback(async (data: string, password: string): Promise<string> => {
     try {
       const key = await deriveKey(password);
       const encoder = new TextEncoder();
@@ -112,9 +103,9 @@ const MemoryGame = () => {
     } catch (error) {
       throw new Error("Encryption failed");
     }
-  }
+  }, [deriveKey]);
 
-  async function decryptData(encryptedData: string, password: string): Promise<string> {
+  const decryptData = useCallback(async (encryptedData: string, password: string): Promise<string> => {
     try {
       const key = await deriveKey(password);
       const [ivBase64, dataBase64, authTagBase64] = encryptedData.split(":");
@@ -137,7 +128,7 @@ const MemoryGame = () => {
     } catch (error) {
       throw new Error("Decryption failed");
     }
-  }
+  }, [deriveKey]);
 
   const initializeGame = useCallback(async () => {
     try {
@@ -175,7 +166,7 @@ const MemoryGame = () => {
     } catch (error) {
       console.error("Error initializing game");
     }
-  }, []);
+  }, [encryptData, decryptData]);
 
   const handleGameComplete = useCallback(async () => {
     if (isGameComplete) return;
@@ -335,6 +326,15 @@ const MemoryGame = () => {
     }
   };
 
+  useEffect(() => {
+    initializeGame();
+    updateWindowSize();
+    loadLeaderboard();
+    getUserCountry();
+    window.addEventListener("resize", updateWindowSize);
+    return () => window.removeEventListener("resize", updateWindowSize);
+  }, [initializeGame]);
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4 relative">
       {isGameComplete && (
@@ -375,7 +375,7 @@ const MemoryGame = () => {
             <h2 className="text-3xl font-bold mb-4">
               {isEasterEggActivated ? "Stop cheating!" : "Congratulations!"}
             </h2>
-            <p className="text-xl mb-2">You've completed the game in {moves} moves!</p>
+            <p className="text-xl mb-2">You&aposve completed the game in {moves} moves!</p>
             <p className="text-xl mb-6">Time: {formatTime(finalGameStats.time)}</p>
             <div className="flex justify-center space-x-4">
               {!hasSubmitted && !isEasterEggActivated && (
