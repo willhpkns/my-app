@@ -200,9 +200,9 @@ async function completeGame(body: any) {
 }
 
 async function submitScore(body: any) {
-  const { sessionId, name, country, moves, time } = body;
+  const { sessionId, name, country } = body;
   
-  if (!sessionId || !name || moves === undefined || time === undefined) {
+  if (!sessionId || !name) {
     console.error('Missing required fields:', body);
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
@@ -210,7 +210,18 @@ async function submitScore(body: any) {
   try {
     const client = await getMongoClient();
     const database = client.db("memoryGame");
+    const sessions = database.collection("sessions");
     const leaderboard = database.collection("leaderboard");
+
+    const session = await sessions.findOne({ id: sessionId });
+
+    if (!session || !session.completed) {
+      console.error('Invalid or incomplete session:', sessionId);
+      return NextResponse.json({ error: 'Invalid game session' }, { status: 400 });
+    }
+
+    const { moves, startTime, endTime } = session;
+    const time = endTime - startTime;
 
     const entry: LeaderboardEntry = {
       name,

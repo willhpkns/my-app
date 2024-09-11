@@ -226,20 +226,33 @@ export default function MemoryGame() {
     }
   }, [cards, flippedCards, sessionId, isGameComplete, gameStarted, emojis.length]);
 
-  const handleGameComplete = useCallback(() => {
+  const handleGameComplete = useCallback(async () => {
     if (isGameComplete) return;
 
     const currentTime = Date.now();
-    const finalTime = currentTime - startTime!;
     const finalMoves = moves + 1;
 
-    setFinalGameStats({ moves: finalMoves, time: finalTime });
+    try {
+      const response = await axios.post('/api/leaderboard', {
+        action: 'completeGame',
+        sessionId,
+        endTime: currentTime,
+        moves: finalMoves,
+      });
 
-    setIsGameComplete(true);
-    setEndTime(currentTime);
-    setShowCongratulationsModal(true);
-    setGameStarted(false);
-  }, [isGameComplete, startTime, moves]);
+      if (response.data.success) {
+        setFinalGameStats({ moves: response.data.moves, time: response.data.time });
+        setIsGameComplete(true);
+        setEndTime(currentTime);
+        setShowCongratulationsModal(true);
+        setGameStarted(false);
+      } else {
+        console.error('Failed to complete game:', response.data.error);
+      }
+    } catch (error) {
+      console.error('Error completing game:', error);
+    }
+  }, [isGameComplete, sessionId, moves]);
 
   const handleTitleClick = useCallback(() => {
     const newCount = titleClickCount + 1
@@ -298,8 +311,6 @@ export default function MemoryGame() {
         sessionId, 
         name, 
         country: userCountry,
-        moves: moves,
-        time: finalGameStats.time,
       });
       await loadLeaderboard();
       setShowLeaderboard(true);
