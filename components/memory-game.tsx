@@ -469,22 +469,30 @@ export default function MemoryGame() {
                 ))}
               </tbody>
             </table>
-            <div className="mt-4 flex justify-center space-x-2">
-              <Button
+            <div className="mt-4 flex justify-center items-center space-x-4">
+              <button
                 onClick={() => loadLeaderboard(currentPage - 1)}
                 disabled={currentPage === 1}
+                className="p-2 disabled:opacity-50 transition-opacity"
+                aria-label="Previous page"
               >
-                Previous
-              </Button>
-              <span className="self-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </button>
+              <span className="text-sm">
                 Page {currentPage} of {totalPages}
               </span>
-              <Button
+              <button
                 onClick={() => loadLeaderboard(currentPage + 1)}
                 disabled={currentPage === totalPages}
+                className="p-2 disabled:opacity-50 transition-opacity"
+                aria-label="Next page"
               >
-                Next
-              </Button>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </button>
             </div>
           </div>
         </div>
