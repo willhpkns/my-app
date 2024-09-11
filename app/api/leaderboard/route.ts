@@ -67,12 +67,25 @@ export async function OPTIONS(request: Request) {
 
 export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = 10;
+    const skip = (page - 1) * limit;
+
     const client = await getMongoClient();
     const database = client.db("memoryGame");
     const leaderboard = database.collection("leaderboard");
     
-    const entries = await leaderboard.find().sort({ time: 1 }).limit(10).toArray();
-    return NextResponse.json(entries, {
+    const entries = await leaderboard.find().sort({ time: 1 }).skip(skip).limit(limit).toArray();
+    const totalEntries = await leaderboard.countDocuments();
+    const totalPages = Math.ceil(totalEntries / limit);
+
+    return NextResponse.json({
+      entries,
+      currentPage: page,
+      totalPages,
+      totalEntries
+    }, {
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',

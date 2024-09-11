@@ -31,6 +31,8 @@ export default function MemoryGame() {
   const [gameStarted, setGameStarted] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [finalGameStats, setFinalGameStats] = useState({ moves: 0, time: 0 });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     initializeGame()
@@ -279,10 +281,12 @@ export default function MemoryGame() {
     setIsEasterEggActivated(false);
   }, [initializeGame]);
 
-  const loadLeaderboard = async () => {
+  const loadLeaderboard = async (page = 1) => {
     try {
-      const response = await axios.get('/api/leaderboard');
-      setLeaderboard(response.data);
+      const response = await axios.get(`/api/leaderboard?page=${page}`);
+      setLeaderboard(response.data.entries);
+      setCurrentPage(response.data.currentPage);
+      setTotalPages(response.data.totalPages);
     } catch (error) {
       console.error('Error loading leaderboard:', error);
     }
@@ -456,7 +460,7 @@ export default function MemoryGame() {
               <tbody>
                 {leaderboard.map((entry, index) => (
                   <tr key={index}>
-                    <td>{index + 1}</td>
+                    <td>{(currentPage - 1) * 10 + index + 1}</td>
                     <td>{entry.name}</td>
                     <td>{formatTime(entry.time)}</td>
                     <td>{entry.moves}</td>
@@ -465,6 +469,23 @@ export default function MemoryGame() {
                 ))}
               </tbody>
             </table>
+            <div className="mt-4 flex justify-center space-x-2">
+              <Button
+                onClick={() => loadLeaderboard(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <span className="self-center">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                onClick={() => loadLeaderboard(currentPage + 1)}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </Button>
+            </div>
           </div>
         </div>
       )}
